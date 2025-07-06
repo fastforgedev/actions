@@ -2,17 +2,150 @@ name: Fastforge Publish
 description: Publish your app into popular testing or distribution platforms.
 author: LiJianying
 inputs:
-  platform:
-    description: ""
+  path:
+    description: "The path to the application bundle to publish."
     required: true
   target:
-    description: ""
+    description: "The target provider(s) to publish to."
     required: true
+
+  # Firebase
+  firebase-app:
+    description: "The unique ID of the application on Firebase. This is NOT your bundle identifier."
+    required: false
+  firebase-release-notes:
+    description: "The release notes for the published application."
+    required: false
+  firebase-release-notes-file:
+    description: "The path of a file containing the release notes. This is a more extensive alternative to firebase-release-notes."
+    required: false
+  firebase-testers:
+    description: "The testers that will be notified about the published application."
+    required: false
+  firebase-testers-file:
+    description: "The path of a file containing testers that will be notified. This is a more extensive alternative to firebase-testers."
+    required: false
+  firebase-groups:
+    description: "The groups that will be notified about the published application."
+    required: false
+  firebase-groups-file:
+    description: "The path of a file containing groups that will be notified. This is a more extensive alternative to firebase-groups."
+    required: false
+
+  # Firebase Hosting
+  firebase-hosting-project-id:
+    description: "The Firebase Hosting project ID."
+    required: false
+
+  # GitHub
+  github-repo-owner:
+    description: "The name of the target GitHub repository owner (namespace)."
+    required: false
+  github-repo-name:
+    description: "The name of the target GitHub repository."
+    required: false
+  github-release-title:
+    description: "The title of the new release on GitHub."
+    required: false
+
+  # PlayStore
+  playstore-package-name:
+    description: "The package name for PlayStore."
+    required: false
+  playstore-track:
+    description: "The track for PlayStore."
+    required: false
+
+  # Qiniu
+  qiniu-bucket:
+    description: "The Qiniu bucket name."
+    required: false
+  qiniu-bucket-domain:
+    description: "The Qiniu bucket domain."
+    required: false
+  qiniu-savekey-prefix:
+    description: "The Qiniu savekey prefix."
+    required: false
+
+  # Vercel
+  vercel-org-id:
+    description: "The Vercel organization ID."
+    required: false
+  vercel-project-id:
+    description: "The Vercel project ID."
+    required: false
+
 runs:
   using: composite
   steps:
     - run: |
-        fastforge publish \
-          --platform '${{ inputs.platform }}' \
-          --target '${{ inputs.target }}'
+        CMD="fastforge publish --path '${{ inputs.path }}' --target '${{ inputs.target }}'"
+
+        # Firebase
+        if [ -n "${{ inputs.firebase-app }}" ]; then
+          CMD="$CMD --firebase-app '${{ inputs.firebase-app }}'"
+        fi
+        if [ -n "${{ inputs.firebase-release-notes }}" ]; then
+          CMD="$CMD --firebase-release-notes '${{ inputs.firebase-release-notes }}'"
+        fi
+        if [ -n "${{ inputs.firebase-release-notes-file }}" ]; then
+          CMD="$CMD --firebase-release-notes-file '${{ inputs.firebase-release-notes-file }}'"
+        fi
+        if [ -n "${{ inputs.firebase-testers }}" ]; then
+          CMD="$CMD --firebase-testers '${{ inputs.firebase-testers }}'"
+        fi
+        if [ -n "${{ inputs.firebase-testers-file }}" ]; then
+          CMD="$CMD --firebase-testers-file '${{ inputs.firebase-testers-file }}'"
+        fi
+        if [ -n "${{ inputs.firebase-groups }}" ]; then
+          CMD="$CMD --firebase-groups '${{ inputs.firebase-groups }}'"
+        fi
+        if [ -n "${{ inputs.firebase-groups-file }}" ]; then
+          CMD="$CMD --firebase-groups-file '${{ inputs.firebase-groups-file }}'"
+        fi
+
+        # Firebase Hosting
+        if [ -n "${{ inputs.firebase-hosting-project-id }}" ]; then
+          CMD="$CMD --firebase-hosting-project-id '${{ inputs.firebase-hosting-project-id }}'"
+        fi
+
+        # GitHub
+        if [ -n "${{ inputs.github-repo-owner }}" ]; then
+          CMD="$CMD --github-repo-owner '${{ inputs.github-repo-owner }}'"
+        fi
+        if [ -n "${{ inputs.github-repo-name }}" ]; then
+          CMD="$CMD --github-repo-name '${{ inputs.github-repo-name }}'"
+        fi
+        if [ -n "${{ inputs.github-release-title }}" ]; then
+          CMD="$CMD --github-release-title '${{ inputs.github-release-title }}'"
+        fi
+
+        # PlayStore
+        if [ -n "${{ inputs.playstore-package-name }}" ]; then
+          CMD="$CMD --playstore-package-name '${{ inputs.playstore-package-name }}'"
+        fi
+        if [ -n "${{ inputs.playstore-track }}" ]; then
+          CMD="$CMD --playstore-track '${{ inputs.playstore-track }}'"
+        fi
+
+        # Qiniu
+        if [ -n "${{ inputs.qiniu-bucket }}" ]; then
+          CMD="$CMD --qiniu-bucket '${{ inputs.qiniu-bucket }}'"
+        fi
+        if [ -n "${{ inputs.qiniu-bucket-domain }}" ]; then
+          CMD="$CMD --qiniu-bucket-domain '${{ inputs.qiniu-bucket-domain }}'"
+        fi
+        if [ -n "${{ inputs.qiniu-savekey-prefix }}" ]; then
+          CMD="$CMD --qiniu-savekey-prefix '${{ inputs.qiniu-savekey-prefix }}'"
+        fi
+
+        # Vercel
+        if [ -n "${{ inputs.vercel-org-id }}" ]; then
+          CMD="$CMD --vercel-org-id '${{ inputs.vercel-org-id }}'"
+        fi
+        if [ -n "${{ inputs.vercel-project-id }}" ]; then
+          CMD="$CMD --vercel-project-id '${{ inputs.vercel-project-id }}'"
+        fi
+
+        eval $CMD
       shell: bash
