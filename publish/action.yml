@@ -1,0 +1,18 @@
+name: Fastforge Publish
+description: Publish your app into popular testing or distribution platforms.
+author: LiJianying
+inputs:
+  platform:
+    description: ""
+    required: true
+  target:
+    description: ""
+    required: true
+runs:
+  using: composite
+  steps:
+    - run: |
+        fastforge publish \
+          --platform '${{ inputs.platform }}' \
+          --target '${{ inputs.target }}'
+      shell: bash

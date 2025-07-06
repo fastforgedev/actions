@@ -1,0 +1,18 @@
+name: Fastforge Package
+description: Package your app into OS-specific bundles.
+author: LiJianying
+inputs:
+  platform:
+    description: "Whether to package for platform"
+    required: true
+  target:
+    description: "Whether to package for target"
+    required: true
+runs:
+  using: composite
+  steps:
+    - run: |
+        fastforge package \
+          --platform '${{ inputs.platform }}' \
+          --target '${{ inputs.target }}'
+      shell: bash

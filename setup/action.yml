@@ -1,0 +1,17 @@
+name: Setup Fastforge Environment
+description: Setup the Fastforge environment for your app.
+author: LiJianying
+inputs:
+  fastforge-version:
+    description: "The version of Fastforge to install. If not specified, the latest version will be used."
+    required: false
+runs:
+  using: composite
+  steps:
+    - run: |
+        if [ -n "${{ inputs.fastforge-version }}" ]; then
+          dart pub global activate fastforge '${{ inputs.fastforge-version }}'
+        else
+          dart pub global activate fastforge
+        fi
+      shell: bash
