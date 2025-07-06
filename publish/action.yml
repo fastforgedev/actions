@@ -38,14 +38,17 @@ inputs:
     required: false
 
   # GitHub
-  github-repo-owner:
-    description: "The name of the target GitHub repository owner (namespace)."
-    required: false
-  github-repo-name:
-    description: "The name of the target GitHub repository."
+  github-repo:
+    description: "The repository to publish to, format: <owner>/<repo>"
     required: false
   github-release-title:
     description: "The title of the new release on GitHub."
+    required: false
+  github-release-draft:
+    description: "Whether to create a draft release on GitHub."
+    required: false
+  github-release-prerelease:
+    description: "Whether to create a prerelease on GitHub."
     required: false
 
   # PlayStore
@@ -110,14 +113,17 @@ runs:
         fi
 
         # GitHub
-        if [ -n "${{ inputs.github-repo-owner }}" ]; then
-          CMD="$CMD --github-repo-owner '${{ inputs.github-repo-owner }}'"
-        fi
-        if [ -n "${{ inputs.github-repo-name }}" ]; then
-          CMD="$CMD --github-repo-name '${{ inputs.github-repo-name }}'"
+        if [ -n "${{ inputs.github-repo }}" ]; then
+          CMD="$CMD --github-repo '${{ inputs.github-repo }}'"
         fi
         if [ -n "${{ inputs.github-release-title }}" ]; then
           CMD="$CMD --github-release-title '${{ inputs.github-release-title }}'"
+        fi
+        if [ -n "${{ inputs.github-release-draft }}" ]; then
+          CMD="$CMD --github-release-draft '${{ inputs.github-release-draft }}'"
+        fi
+        if [ -n "${{ inputs.github-release-prerelease }}" ]; then
+          CMD="$CMD --github-release-prerelease '${{ inputs.github-release-prerelease }}'"
         fi
 
         # PlayStore
