@@ -8,6 +8,9 @@ inputs:
   target:
     description: "The target provider(s) to publish to."
     required: true
+  app-version:
+    description: "The version of the application to publish."
+    required: false
 
   # Firebase
   firebase-app:
@@ -83,6 +86,10 @@ runs:
   steps:
     - run: |
         CMD="fastforge publish --path '${{ inputs.path }}' --target '${{ inputs.target }}'"
+
+        if [ -n "${{ inputs.app-version }}" ]; then
+          CMD="$CMD --app-version '${{ inputs.app-version }}'"
+        fi
 
         # Firebase
         if [ -n "${{ inputs.firebase-app }}" ]; then
