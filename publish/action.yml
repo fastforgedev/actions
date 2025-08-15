@@ -40,6 +40,26 @@ inputs:
     description: "The Firebase Hosting project ID."
     required: false
 
+  # Minio
+  minio-endpoint:
+    description: "The Minio endpoint."
+    required: false
+  minio-access-key:
+    description: "The Minio access key."
+    required: false
+  minio-secret-key:
+    description: "The Minio secret key."
+    required: false
+  minio-region:
+    description: "The Minio region."
+    required: false
+  minio-bucket:
+    description: "The Minio bucket name."
+    required: false
+  minio-savekey-prefix:
+    description: "The Minio savekey prefix."
+    required: false
+
   # GitHub
   github-repo:
     description: "The repository to publish to, format: <owner>/<repo>"
@@ -117,6 +137,26 @@ runs:
         # Firebase Hosting
         if [ -n "${{ inputs.firebase-hosting-project-id }}" ]; then
           CMD="$CMD --firebase-hosting-project-id '${{ inputs.firebase-hosting-project-id }}'"
+        fi
+
+        # Minio
+        if [ -n "${{ inputs.minio-endpoint }}" ]; then
+          CMD="$CMD --minio-endpoint '${{ inputs.minio-endpoint }}'"
+        fi
+        if [ -n "${{ inputs.minio-access-key }}" ]; then
+          CMD="$CMD --minio-access-key '${{ inputs.minio-access-key }}'"
+        fi
+        if [ -n "${{ inputs.minio-secret-key }}" ]; then
+          CMD="$CMD --minio-secret-key '${{ inputs.minio-secret-key }}'"
+        fi
+        if [ -n "${{ inputs.minio-region }}" ]; then
+          CMD="$CMD --minio-region '${{ inputs.minio-region }}'"
+        fi
+        if [ -n "${{ inputs.minio-bucket }}" ]; then
+          CMD="$CMD --minio-bucket '${{ inputs.minio-bucket }}'"
+        fi
+        if [ -n "${{ inputs.minio-savekey-prefix }}" ]; then
+          CMD="$CMD --minio-savekey-prefix '${{ inputs.minio-savekey-prefix }}'"
         fi
 
         # GitHub
