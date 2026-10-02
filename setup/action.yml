@@ -51,7 +51,10 @@ runs:
           # Fall back to the copy in the Fastforge repository.
           curl -fsSL https://raw.githubusercontent.com/fastforgedev/fastforge/main/install.sh -o "$installer"
         fi
-        FASTFORGE_INSTALL_DIR="$install_dir" sh "$installer"
+        if ! FASTFORGE_INSTALL_DIR="$install_dir" sh "$installer"; then
+          echo "::error::Could not install Fastforge. The newest release may still be a draft, or it may not ship an archive for this platform - see the Troubleshooting section of this repository's README."
+          exit 1
+        fi
 
         printf '%s\n' "$install_dir" >> "$GITHUB_PATH"
 

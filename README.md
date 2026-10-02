@@ -130,6 +130,17 @@ Credentials always come from the environment of the step, never from inputs:
 | `playstore`                 | `PLAYSTORE_CREDENTIALS` (path to a service account JSON) |
 | `s3`, `minio`, `qiniu`, `oss`, `cos` | `S3_*`, `MINIO_*`, `QINIU_*`, `OSS_*`, `COS_*` |
 
+## Troubleshooting
+
+### `setup` fails with `No release provides a prebuilt binary for <target>`
+
+The installer reads the [Fastforge releases](https://github.com/fastforgedev/fastforge/releases) and picks the newest one that ships an archive for the runner platform. It reports this when
+
+- the newest release is still a **draft**. Drafts are invisible to the releases API unless the token has access to the `fastforgedev/fastforge` repository, and the automatic `GITHUB_TOKEN` of another repository does not, or
+- that release carries no archive for the runner platform: `install.sh` covers macOS and Linux, `install.ps1` covers Windows, an archive per OS and architecture has to exist in the release.
+
+Fix it by publishing the release and making sure it carries an archive for every platform the workflow builds on. `fastforge-version` only helps when the version is a *published* release, since draft assets cannot be downloaded anonymously.
+
 ## License
 
 [MIT](./LICENSE)
