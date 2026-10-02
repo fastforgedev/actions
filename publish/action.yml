@@ -209,16 +209,17 @@ runs:
 
         # `publish-args` is a JSON object so that arguments without a dedicated
         # input (for example `release-tag`, or the `s3`/`oss`/`cos` options) can
-        # still be passed. `jq` ships with every GitHub-hosted runner; on Windows
-        # it writes CRLF, so the trailing carriage return `read` keeps has to be
-        # dropped.
+        # still be passed. `jq` ships with every GitHub-hosted runner. Entries
+        # are read NUL separated because a value may hold several lines — the
+        # `custom` target usually hands over a small script — and `jq -j` also
+        # keeps Windows from turning the separator into CRLF.
         if [ -n "$INPUT_PUBLISH_ARGS" ]; then
-          while IFS= read -r argument; do
+          while IFS= read -r -d '' argument; do
             argument="${argument%$'\r'}"
             if [ -n "$argument" ]; then
               args+=(--publish-arg "$argument")
             fi
-          done < <(printf '%s' "$INPUT_PUBLISH_ARGS" | jq -r 'to_entries[] | "\(.key)=\(.value | tostring)"')
+          done < <(printf '%s' "$INPUT_PUBLISH_ARGS" | jq -j 'to_entries[] | "\(.key)=\(.value | tostring)\u0000"')
         fi
 
         # `path` may list several artifacts; fastforge publishes one at a time.

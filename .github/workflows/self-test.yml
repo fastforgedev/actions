@@ -30,7 +30,9 @@ jobs:
           - os: windows-latest
             platform: windows
             target: zip
-            verify: dir %ARTIFACT_PATH%
+            # `dir` reads the `/` in fastforge's Windows paths as a switch, so
+            # check the artifact with `if exist` instead.
+            verify: if exist %ARTIFACT_PATH% (echo %ARTIFACT_PATH%) else (exit /b 1)
     steps:
       - uses: actions/checkout@v4
 
@@ -68,6 +70,48 @@ jobs:
 
       - name: Create a throwaway app
         run: flutter create --platforms=${{ matrix.platform }} sandbox
+
+      - name: Configure the AppImage metadata
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+
+          # `appimagetool` insists on a `Categories` entry and an AppDir icon, so
+          # a project that packages an AppImage ships `linux/packaging/appimage`.
+          mkdir -p sandbox/linux/packaging/appimage
+          cat > sandbox/linux/packaging/appimage/make_config.yaml <<'YAML'
+          display_name: Sandbox
+          icon: icon.png
+          generic_name: Self test application
+          categories:
+            - Utility
+          YAML
+
+          python3 - <<'PY'
+          import struct
+          import zlib
+
+          size = 256
+          raw = b"".join(b"\x00" + bytes([0x42, 0x8D, 0xE9]) * size for _ in range(size))
+
+
+          def chunk(kind, data):
+              body = kind + data
+              return (
+                  struct.pack(">I", len(data))
+                  + body
+                  + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+              )
+
+
+          png = (
+              b"\x89PNG\r\n\x1a\n"
+              + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0))
+              + chunk(b"IDAT", zlib.compress(raw, 9))
+              + chunk(b"IEND", b"")
+          )
+          open("sandbox/icon.png", "wb").write(png)
+          PY
 
       - name: Set up Fastforge
         id: setup
