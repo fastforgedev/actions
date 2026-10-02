@@ -1,6 +1,11 @@
 name: Fastforge Publish
 description: Publish your app into popular testing or distribution platforms.
 author: LiJianying
+
+branding:
+  icon: upload
+  color: blue
+
 inputs:
   path:
     description: "The path to the application bundle to publish."
@@ -8,8 +13,22 @@ inputs:
   target:
     description: "The target provider(s) to publish to."
     required: true
+  working-directory:
+    description: >-
+      Directory to run `fastforge` from, relative to the workspace. Artifact
+      paths are resolved relative to it.
+    required: false
+    default: "."
   app-version:
     description: "The version of the application to publish."
+    required: false
+  publish-args:
+    description: >-
+      JSON object of additional publisher arguments, for example
+      `{"release-tag":"v1.0.0"}` or `{"endpoint":"https://s3.example.com"}`.
+      Values must be strings. Use this for every option the inputs below do not
+      cover (`fastforge publish --help` lists all of them); it takes precedence
+      over the inputs below.
     required: false
 
   # Firebase
@@ -101,104 +120,144 @@ inputs:
     description: "The Vercel project ID."
     required: false
 
+outputs:
+  message:
+    description: The result message of the last publisher that ran.
+    value: ${{ steps.publish.outputs.message }}
+
 runs:
   using: composite
   steps:
-    - run: |
-        CMD="fastforge publish --path '${{ inputs.path }}' --target '${{ inputs.target }}'"
-
-        if [ -n "${{ inputs.app-version }}" ]; then
-          CMD="$CMD --app-version '${{ inputs.app-version }}'"
-        fi
-
-        # Firebase
-        if [ -n "${{ inputs.firebase-app }}" ]; then
-          CMD="$CMD --firebase-app '${{ inputs.firebase-app }}'"
-        fi
-        if [ -n "${{ inputs.firebase-release-notes }}" ]; then
-          CMD="$CMD --firebase-release-notes '${{ inputs.firebase-release-notes }}'"
-        fi
-        if [ -n "${{ inputs.firebase-release-notes-file }}" ]; then
-          CMD="$CMD --firebase-release-notes-file '${{ inputs.firebase-release-notes-file }}'"
-        fi
-        if [ -n "${{ inputs.firebase-testers }}" ]; then
-          CMD="$CMD --firebase-testers '${{ inputs.firebase-testers }}'"
-        fi
-        if [ -n "${{ inputs.firebase-testers-file }}" ]; then
-          CMD="$CMD --firebase-testers-file '${{ inputs.firebase-testers-file }}'"
-        fi
-        if [ -n "${{ inputs.firebase-groups }}" ]; then
-          CMD="$CMD --firebase-groups '${{ inputs.firebase-groups }}'"
-        fi
-        if [ -n "${{ inputs.firebase-groups-file }}" ]; then
-          CMD="$CMD --firebase-groups-file '${{ inputs.firebase-groups-file }}'"
-        fi
-
-        # Firebase Hosting
-        if [ -n "${{ inputs.firebase-hosting-project-id }}" ]; then
-          CMD="$CMD --firebase-hosting-project-id '${{ inputs.firebase-hosting-project-id }}'"
-        fi
-
-        # Minio
-        if [ -n "${{ inputs.minio-endpoint }}" ]; then
-          CMD="$CMD --minio-endpoint '${{ inputs.minio-endpoint }}'"
-        fi
-        if [ -n "${{ inputs.minio-access-key }}" ]; then
-          CMD="$CMD --minio-access-key '${{ inputs.minio-access-key }}'"
-        fi
-        if [ -n "${{ inputs.minio-secret-key }}" ]; then
-          CMD="$CMD --minio-secret-key '${{ inputs.minio-secret-key }}'"
-        fi
-        if [ -n "${{ inputs.minio-region }}" ]; then
-          CMD="$CMD --minio-region '${{ inputs.minio-region }}'"
-        fi
-        if [ -n "${{ inputs.minio-bucket }}" ]; then
-          CMD="$CMD --minio-bucket '${{ inputs.minio-bucket }}'"
-        fi
-        if [ -n "${{ inputs.minio-savekey-prefix }}" ]; then
-          CMD="$CMD --minio-savekey-prefix '${{ inputs.minio-savekey-prefix }}'"
-        fi
-
-        # GitHub
-        if [ -n "${{ inputs.github-repo }}" ]; then
-          CMD="$CMD --github-repo '${{ inputs.github-repo }}'"
-        fi
-        if [ -n "${{ inputs.github-release-title }}" ]; then
-          CMD="$CMD --github-release-title '${{ inputs.github-release-title }}'"
-        fi
-        if [ -n "${{ inputs.github-release-draft }}" ]; then
-          CMD="$CMD --github-release-draft '${{ inputs.github-release-draft }}'"
-        fi
-        if [ -n "${{ inputs.github-release-prerelease }}" ]; then
-          CMD="$CMD --github-release-prerelease '${{ inputs.github-release-prerelease }}'"
-        fi
-
-        # PlayStore
-        if [ -n "${{ inputs.playstore-package-name }}" ]; then
-          CMD="$CMD --playstore-package-name '${{ inputs.playstore-package-name }}'"
-        fi
-        if [ -n "${{ inputs.playstore-track }}" ]; then
-          CMD="$CMD --playstore-track '${{ inputs.playstore-track }}'"
-        fi
-
-        # Qiniu
-        if [ -n "${{ inputs.qiniu-bucket }}" ]; then
-          CMD="$CMD --qiniu-bucket '${{ inputs.qiniu-bucket }}'"
-        fi
-        if [ -n "${{ inputs.qiniu-bucket-domain }}" ]; then
-          CMD="$CMD --qiniu-bucket-domain '${{ inputs.qiniu-bucket-domain }}'"
-        fi
-        if [ -n "${{ inputs.qiniu-savekey-prefix }}" ]; then
-          CMD="$CMD --qiniu-savekey-prefix '${{ inputs.qiniu-savekey-prefix }}'"
-        fi
-
-        # Vercel
-        if [ -n "${{ inputs.vercel-org-id }}" ]; then
-          CMD="$CMD --vercel-org-id '${{ inputs.vercel-org-id }}'"
-        fi
-        if [ -n "${{ inputs.vercel-project-id }}" ]; then
-          CMD="$CMD --vercel-project-id '${{ inputs.vercel-project-id }}'"
-        fi
-
-        eval $CMD
+    - name: Publish
+      id: publish
       shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_TARGET: ${{ inputs.target }}
+        INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_APP_VERSION: ${{ inputs.app-version }}
+        INPUT_PUBLISH_ARGS: ${{ inputs.publish-args }}
+        INPUT_FIREBASE_APP: ${{ inputs.firebase-app }}
+        INPUT_FIREBASE_RELEASE_NOTES: ${{ inputs.firebase-release-notes }}
+        INPUT_FIREBASE_RELEASE_NOTES_FILE: ${{ inputs.firebase-release-notes-file }}
+        INPUT_FIREBASE_TESTERS: ${{ inputs.firebase-testers }}
+        INPUT_FIREBASE_TESTERS_FILE: ${{ inputs.firebase-testers-file }}
+        INPUT_FIREBASE_GROUPS: ${{ inputs.firebase-groups }}
+        INPUT_FIREBASE_GROUPS_FILE: ${{ inputs.firebase-groups-file }}
+        INPUT_FIREBASE_HOSTING_PROJECT_ID: ${{ inputs.firebase-hosting-project-id }}
+        INPUT_MINIO_ENDPOINT: ${{ inputs.minio-endpoint }}
+        INPUT_MINIO_ACCESS_KEY: ${{ inputs.minio-access-key }}
+        INPUT_MINIO_SECRET_KEY: ${{ inputs.minio-secret-key }}
+        INPUT_MINIO_REGION: ${{ inputs.minio-region }}
+        INPUT_MINIO_BUCKET: ${{ inputs.minio-bucket }}
+        INPUT_MINIO_SAVEKEY_PREFIX: ${{ inputs.minio-savekey-prefix }}
+        INPUT_GITHUB_REPO: ${{ inputs.github-repo }}
+        INPUT_GITHUB_RELEASE_TITLE: ${{ inputs.github-release-title }}
+        INPUT_GITHUB_RELEASE_DRAFT: ${{ inputs.github-release-draft }}
+        INPUT_GITHUB_RELEASE_PRERELEASE: ${{ inputs.github-release-prerelease }}
+        INPUT_PLAYSTORE_PACKAGE_NAME: ${{ inputs.playstore-package-name }}
+        INPUT_PLAYSTORE_TRACK: ${{ inputs.playstore-track }}
+        INPUT_QINIU_BUCKET: ${{ inputs.qiniu-bucket }}
+        INPUT_QINIU_BUCKET_DOMAIN: ${{ inputs.qiniu-bucket-domain }}
+        INPUT_QINIU_SAVEKEY_PREFIX: ${{ inputs.qiniu-savekey-prefix }}
+        INPUT_VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        INPUT_VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+      run: |
+        set -euo pipefail
+
+        cd "${INPUT_WORKING_DIRECTORY:-.}"
+
+        args=(publish --targets "$INPUT_TARGET")
+
+        if [ -n "$INPUT_APP_VERSION" ]; then
+          args+=(--app-version "$INPUT_APP_VERSION")
+        fi
+
+        # Provider specific options. Each one is also accepted as a
+        # `<target>-<name>` entry of `publish-args`, which wins over these.
+        add_argument() {
+          if [ -n "$2" ]; then
+            args+=("$1" "$2")
+          fi
+        }
+
+        add_argument --firebase-app "$INPUT_FIREBASE_APP"
+        add_argument --firebase-release-notes "$INPUT_FIREBASE_RELEASE_NOTES"
+        add_argument --firebase-release-notes-file "$INPUT_FIREBASE_RELEASE_NOTES_FILE"
+        add_argument --firebase-testers "$INPUT_FIREBASE_TESTERS"
+        add_argument --firebase-testers-file "$INPUT_FIREBASE_TESTERS_FILE"
+        add_argument --firebase-groups "$INPUT_FIREBASE_GROUPS"
+        add_argument --firebase-groups-file "$INPUT_FIREBASE_GROUPS_FILE"
+        add_argument --firebase-hosting-project-id "$INPUT_FIREBASE_HOSTING_PROJECT_ID"
+        add_argument --minio-endpoint "$INPUT_MINIO_ENDPOINT"
+        add_argument --minio-access-key "$INPUT_MINIO_ACCESS_KEY"
+        add_argument --minio-secret-key "$INPUT_MINIO_SECRET_KEY"
+        add_argument --minio-region "$INPUT_MINIO_REGION"
+        add_argument --minio-bucket "$INPUT_MINIO_BUCKET"
+        add_argument --minio-savekey-prefix "$INPUT_MINIO_SAVEKEY_PREFIX"
+        add_argument --github-repo "$INPUT_GITHUB_REPO"
+        add_argument --github-release-title "$INPUT_GITHUB_RELEASE_TITLE"
+        add_argument --github-release-draft "$INPUT_GITHUB_RELEASE_DRAFT"
+        add_argument --github-release-prerelease "$INPUT_GITHUB_RELEASE_PRERELEASE"
+        add_argument --playstore-package-name "$INPUT_PLAYSTORE_PACKAGE_NAME"
+        add_argument --playstore-track "$INPUT_PLAYSTORE_TRACK"
+        add_argument --qiniu-bucket "$INPUT_QINIU_BUCKET"
+        add_argument --qiniu-bucket-domain "$INPUT_QINIU_BUCKET_DOMAIN"
+        add_argument --qiniu-savekey-prefix "$INPUT_QINIU_SAVEKEY_PREFIX"
+        add_argument --vercel-org-id "$INPUT_VERCEL_ORG_ID"
+        add_argument --vercel-project-id "$INPUT_VERCEL_PROJECT_ID"
+
+        # `publish-args` is a JSON object so that arguments without a dedicated
+        # input (for example `release-tag`, or the `s3`/`oss`/`cos` options) can
+        # still be passed. `jq` ships with every GitHub-hosted runner.
+        if [ -n "$INPUT_PUBLISH_ARGS" ]; then
+          while IFS= read -r argument; do
+            if [ -n "$argument" ]; then
+              args+=(--publish-arg "$argument")
+            fi
+          done < <(printf '%s' "$INPUT_PUBLISH_ARGS" | jq -r 'to_entries[] | "\(.key)=\(.value | tostring)"')
+        fi
+
+        # `path` may list several artifacts; fastforge publishes one at a time.
+        IFS=',' read -r -a paths <<< "$INPUT_PATH"
+
+        esc=$'\033'
+        message=""
+        published=0
+
+        for path in "${paths[@]}"; do
+          path="$(printf '%s' "$path" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          if [ -z "$path" ]; then
+            continue
+          fi
+
+          printf 'Publishing %s to %s...\n' "$path" "$INPUT_TARGET"
+          log="$(mktemp)"
+          fastforge "${args[@]}" --path "$path" 2>&1 | tee "$log"
+          published=$((published + 1))
+
+          # `fastforge` prints `Successfully published <message>`, colored with
+          # ANSI escapes that have to be stripped.
+          while IFS= read -r line; do
+            case "$line" in
+              *"Successfully published "*)
+                message="$(printf '%s\n' "${line##*Successfully published }" | sed "s/${esc}\[[0-9;]*m//g")"
+                ;;
+            esac
+          done < "$log"
+          rm -f "$log"
+        done
+
+        if [ "$published" -eq 0 ]; then
+          echo "::error::No artifact path was given to publish."
+          exit 1
+        fi
+
+        # A publisher may report several lines (the `custom` target returns the
+        # output of its command), so the value is written with the multi-line
+        # syntax `$GITHUB_OUTPUT` expects.
+        {
+          echo "message<<FASTFORGE_MESSAGE"
+          printf '%s\n' "$message"
+          echo "FASTFORGE_MESSAGE"
+        } >> "$GITHUB_OUTPUT"

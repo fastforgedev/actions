@@ -1,17 +1,106 @@
 name: Setup Fastforge Environment
 description: Setup the Fastforge environment for your app.
 author: LiJianying
+
+branding:
+  icon: package
+  color: blue
+
 inputs:
   fastforge-version:
     description: "The version of Fastforge to install. If not specified, the latest version will be used."
     required: false
+  install-dir:
+    description: >-
+      Directory the `fastforge` binary is installed into. Defaults to
+      `$HOME/.local/bin` on macOS and Linux and to
+      `%LOCALAPPDATA%\fastforge\bin` on Windows.
+    required: false
+  token:
+    description: >-
+      GitHub token used to look up the latest release. Defaults to the token of
+      this workflow run, which avoids the anonymous GitHub API rate limit.
+    required: false
+
+outputs:
+  version:
+    description: The installed Fastforge version.
+    value: ${{ steps.version.outputs.version }}
+  path:
+    description: The directory the `fastforge` binary was installed into.
+    value: ${{ steps.version.outputs.path }}
+
 runs:
   using: composite
   steps:
-    - run: |
-        if [ -n "${{ inputs.fastforge-version }}" ]; then
-          dart pub global activate fastforge '${{ inputs.fastforge-version }}'
-        else
-          dart pub global activate fastforge
-        fi
+    - name: Install Fastforge
+      if: runner.os != 'Windows'
       shell: bash
+      env:
+        FASTFORGE_VERSION: ${{ inputs.fastforge-version }}
+        FASTFORGE_INSTALL_DIR: ${{ inputs.install-dir }}
+        GITHUB_TOKEN: ${{ inputs.token || github.token }}
+      run: |
+        set -euo pipefail
+
+        install_dir="${FASTFORGE_INSTALL_DIR:-$HOME/.local/bin}"
+        installer="$(mktemp)"
+        trap 'rm -f "$installer"' EXIT
+
+        if ! curl -fsSL https://fastforge-web.lijy91.workers.dev/install.sh -o "$installer"; then
+          # Fall back to the copy in the Fastforge repository.
+          curl -fsSL https://raw.githubusercontent.com/fastforgedev/fastforge/main/install.sh -o "$installer"
+        fi
+        FASTFORGE_INSTALL_DIR="$install_dir" sh "$installer"
+
+        printf '%s\n' "$install_dir" >> "$GITHUB_PATH"
+
+    - name: Install Fastforge
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        FASTFORGE_VERSION: ${{ inputs.fastforge-version }}
+        FASTFORGE_INSTALL_DIR: ${{ inputs.install-dir }}
+        GITHUB_TOKEN: ${{ inputs.token || github.token }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+
+        $installDir = $env:FASTFORGE_INSTALL_DIR
+        if ([string]::IsNullOrWhiteSpace($installDir)) {
+          $installDir = Join-Path $env:LOCALAPPDATA 'fastforge\bin'
+        }
+        $env:FASTFORGE_INSTALL_DIR = $installDir
+
+        $sources = @(
+          'https://fastforge-web.lijy91.workers.dev/install.ps1',
+          # Fall back to the copy in the Fastforge repository.
+          'https://raw.githubusercontent.com/fastforgedev/fastforge/main/install.ps1'
+        )
+        $installer = $null
+        foreach ($source in $sources) {
+          try {
+            $installer = (Invoke-WebRequest -UseBasicParsing -Uri $source).Content
+            break
+          } catch {
+            Write-Host "Could not download $source"
+          }
+        }
+        if (-not $installer) {
+          throw 'Could not download the Fastforge installer.'
+        }
+        Invoke-Expression $installer
+
+        $installDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    - name: Show the installed version
+      id: version
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        version="$(fastforge --version | head -n1)"
+        install_dir="$(dirname "$(command -v fastforge)")"
+
+        printf '%s\n' "$version"
+        printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+        printf 'path=%s\n' "$install_dir" >> "$GITHUB_OUTPUT"

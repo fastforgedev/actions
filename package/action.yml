@@ -1,6 +1,11 @@
 name: Fastforge Package
 description: Package your app into OS-specific bundles.
 author: LiJianying
+
+branding:
+  icon: package
+  color: blue
+
 inputs:
   platform:
     description: "Whether to package for platform"
@@ -8,11 +13,211 @@ inputs:
   target:
     description: "Whether to package for target"
     required: true
+  working-directory:
+    description: >-
+      Directory that holds the project to package (the directory with
+      `pubspec.yaml`), relative to the workspace. Also the `WORKSPACE` used by
+      `fastforge` to locate `distribute_options.yaml`.
+    required: false
+    default: "."
+  artifact-name:
+    description: >-
+      Mustache template for the artifact name, for example
+      `{{name}}-{{build_name}}-{{platform}}.{{ext}}`. Supported variables:
+      `name`, `version`, `build_name`, `build_number`, `build_mode`, `platform`,
+      `flavor`, `channel`, `ext` plus the `is_installer`, `is_profile` and
+      `has_build_number` booleans. Defaults to the Fastforge template; the
+      `artifact_name` key of `distribute_options.yaml` is only used by the
+      legacy `fastforge release` command.
+    required: false
+  channel:
+    description: >-
+      Distribution channel. In the default artifact name it replaces the flavor
+      segment.
+    required: false
+  skip-clean:
+    description: >-
+      Set to `true` to skip `flutter clean` before packaging.
+    required: false
+    default: "false"
+  build-target:
+    description: >-
+      The `--target` argument passed to `flutter build`, for example
+      `lib/main_prod.dart`.
+    required: false
+  build-flavor:
+    description: The `--flavor` argument passed to `flutter build`.
+    required: false
+  build-target-platform:
+    description: The `--target-platform` argument passed to `flutter build`.
+    required: false
+  build-export-options-plist:
+    description: The `--export-options-plist` argument passed to `flutter build`.
+    required: false
+  flutter-build-args:
+    description: >-
+      Extra arguments passed to `flutter build`, comma separated, for example
+      `verbose,obfuscate`.
+    required: false
+  dart-define:
+    description: >-
+      JSON object of `--dart-define` values, for example
+      `{"APP_ENV":"production"}`.
+    required: false
+  hook-pre:
+    description: >-
+      Shell command to run after the build and before the artifact is packaged.
+      Receives `PLATFORM`, `PACKAGE_FORMAT`, `BUILD_MODE`, `OUTPUT_DIRECTORY`,
+      `BUILD_OUTPUT_DIRECTORY` and `BUILD_OUTPUT_FILES` in its environment.
+    required: false
+  hook-post:
+    description: Shell command to run after the artifact is packaged.
+    required: false
+
+outputs:
+  artifact-paths:
+    description: >-
+      Comma separated list of the packaged artifacts, relative to
+      `working-directory`.
+    value: ${{ steps.package.outputs.artifact-paths }}
+  artifact-count:
+    description: Number of artifacts that were packaged.
+    value: ${{ steps.package.outputs.artifact-count }}
+  output-directory:
+    description: >-
+      Directory the artifacts were written to, relative to `working-directory`.
+    value: ${{ steps.package.outputs.output-directory }}
+
 runs:
   using: composite
   steps:
-    - run: |
-        fastforge package \
-          --platform '${{ inputs.platform }}' \
-          --target '${{ inputs.target }}'
+    - name: Package
+      id: package
       shell: bash
+      env:
+        INPUT_PLATFORM: ${{ inputs.platform }}
+        INPUT_TARGET: ${{ inputs.target }}
+        INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        INPUT_CHANNEL: ${{ inputs.channel }}
+        INPUT_SKIP_CLEAN: ${{ inputs.skip-clean }}
+        INPUT_BUILD_TARGET: ${{ inputs.build-target }}
+        INPUT_BUILD_FLAVOR: ${{ inputs.build-flavor }}
+        INPUT_BUILD_TARGET_PLATFORM: ${{ inputs.build-target-platform }}
+        INPUT_BUILD_EXPORT_OPTIONS_PLIST: ${{ inputs.build-export-options-plist }}
+        INPUT_FLUTTER_BUILD_ARGS: ${{ inputs.flutter-build-args }}
+        INPUT_DART_DEFINE: ${{ inputs.dart-define }}
+        INPUT_HOOK_PRE: ${{ inputs.hook-pre }}
+        INPUT_HOOK_POST: ${{ inputs.hook-post }}
+      run: |
+        set -euo pipefail
+
+        cd "${INPUT_WORKING_DIRECTORY:-.}"
+
+        # `fastforge package` writes to `<output>/<app version>/<artifact name>`,
+        # where `<output>` is the `output` key of `distribute_options.yaml`
+        # (default: `dist/`).
+        output_directory="dist/"
+        if [ -f distribute_options.yaml ]; then
+          configured="$(sed -n 's/^output:[[:space:]]*//p' distribute_options.yaml | head -n1 | tr -d "\"'")"
+          if [ -n "$configured" ]; then
+            output_directory="$configured"
+          fi
+        fi
+
+        args=(package --platform "$INPUT_PLATFORM" --targets "$INPUT_TARGET")
+
+        if [ -n "$INPUT_ARTIFACT_NAME" ]; then
+          args+=(--artifact-name "$INPUT_ARTIFACT_NAME")
+        fi
+        if [ -n "$INPUT_CHANNEL" ]; then
+          args+=(--channel "$INPUT_CHANNEL")
+        fi
+        if [ "$INPUT_SKIP_CLEAN" = "true" ]; then
+          args+=(--skip-clean)
+        fi
+        if [ -n "$INPUT_BUILD_TARGET" ]; then
+          args+=(--build-target "$INPUT_BUILD_TARGET")
+        fi
+        if [ -n "$INPUT_BUILD_FLAVOR" ]; then
+          args+=(--build-flavor "$INPUT_BUILD_FLAVOR")
+        fi
+        if [ -n "$INPUT_BUILD_TARGET_PLATFORM" ]; then
+          args+=(--build-target-platform "$INPUT_BUILD_TARGET_PLATFORM")
+        fi
+        if [ -n "$INPUT_BUILD_EXPORT_OPTIONS_PLIST" ]; then
+          args+=(--build-export-options-plist "$INPUT_BUILD_EXPORT_OPTIONS_PLIST")
+        fi
+        if [ -n "$INPUT_FLUTTER_BUILD_ARGS" ]; then
+          args+=(--flutter-build-args "$INPUT_FLUTTER_BUILD_ARGS")
+        fi
+        if [ -n "$INPUT_HOOK_PRE" ]; then
+          args+=(--hook-pre "$INPUT_HOOK_PRE")
+        fi
+        if [ -n "$INPUT_HOOK_POST" ]; then
+          args+=(--hook-post "$INPUT_HOOK_POST")
+        fi
+
+        # `dart-define` is given as a JSON object so a whole environment can be
+        # passed with one input. `jq` ships with every GitHub-hosted runner.
+        if [ -n "$INPUT_DART_DEFINE" ]; then
+          while IFS= read -r define; do
+            if [ -n "$define" ]; then
+              args+=(--build-dart-define "$define")
+            fi
+          done < <(printf '%s' "$INPUT_DART_DEFINE" | jq -r 'to_entries[] | "\(.key)=\(.value | tostring)"')
+        fi
+
+        log="$(mktemp)"
+        before="$(mktemp)"
+        trap 'rm -f "$log" "$before"' EXIT
+
+        # Everything `fastforge` leaves in the output directory, used as a
+        # fallback when the artifact lines below cannot be read.
+        snapshot() {
+          if [ -d "$output_directory" ]; then
+            find "$output_directory" -mindepth 2 -maxdepth 2 -print 2>/dev/null | LC_ALL=C sort
+          fi
+        }
+        snapshot > "$before"
+
+        # A failing `fastforge` fails the step: `pipefail` keeps the exit code
+        # of the CLI even though the output is piped through `tee`.
+        fastforge "${args[@]}" 2>&1 | tee "$log"
+
+        # `fastforge` prints one `Successfully packaged <path>` line per
+        # artifact, colored with ANSI escapes that have to be stripped. The loop
+        # lives in a function because bash 3.2 (still `/bin/bash` on macOS
+        # runners) cannot parse a `case` pattern holding a space inside a
+        # command substitution.
+        extract_packaged_paths() {
+          local esc=$'\033'
+          while IFS= read -r line; do
+            case "$line" in
+              *"Successfully packaged "*)
+                printf '%s\n' "${line##*Successfully packaged }" | sed "s/${esc}\[[0-9;]*m//g"
+                ;;
+            esac
+          done
+        }
+
+        artifact_paths="$(extract_packaged_paths < "$log")"
+
+        if [ -z "$artifact_paths" ]; then
+          artifact_paths="$(snapshot | LC_ALL=C comm -13 "$before" - || true)"
+        fi
+
+        artifact_paths="$(printf '%s\n' "$artifact_paths" | grep -v '^[[:space:]]*$' | paste -sd, - || true)"
+
+        if [ -z "$artifact_paths" ]; then
+          echo "::error::Fastforge packaged no artifact, see the log above."
+          exit 1
+        fi
+
+        artifact_count="$(printf '%s' "$artifact_paths" | awk -F, '{ print NF }')"
+
+        printf 'artifact-paths=%s\n' "$artifact_paths" >> "$GITHUB_OUTPUT"
+        printf 'artifact-count=%s\n' "$artifact_count" >> "$GITHUB_OUTPUT"
+        printf 'output-directory=%s\n' "$output_directory" >> "$GITHUB_OUTPUT"
+
+        printf 'Packaged %s artifact(s): %s\n' "$artifact_count" "$artifact_paths"

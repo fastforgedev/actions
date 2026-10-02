@@ -1,0 +1,129 @@
+name: Self Test
+
+# Acceptance test for the three actions in this repository. It scaffolds a
+# throwaway Flutter app and drives the actions through it with the local action
+# paths (`./setup`, `./package`, `./publish`), so the working tree is what gets
+# tested. Nothing is published anywhere: the `custom` publisher target only
+# lists the artifact it was handed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: Smoke test (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            target: deb,appimage
+            verify: ls -l $ARTIFACT_PATH
+          - os: macos-latest
+            platform: macos
+            target: dmg
+            verify: ls -l $ARTIFACT_PATH
+          - os: windows-latest
+            platform: windows
+            target: zip
+            verify: dir %ARTIFACT_PATH%
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install appimagetool
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+
+          curl -fsSL -o /tmp/appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          sudo install -m 0755 /tmp/appimagetool /usr/local/bin/appimagetool
+
+          # GitHub runners have no FUSE, so let the tool unpack itself instead of
+          # mounting the AppImage.
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> "$GITHUB_ENV"
+
+      - name: Create a throwaway app
+        run: flutter create --platforms=${{ matrix.platform }} sandbox
+
+      - name: Set up Fastforge
+        id: setup
+        uses: ./setup
+
+      - name: Check the installed version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          printf 'setup output: %s\n' "${{ steps.setup.outputs.version }}"
+          fastforge --version
+
+      - name: Package
+        id: package
+        uses: ./package
+        with:
+          platform: ${{ matrix.platform }}
+          target: ${{ matrix.target }}
+          working-directory: sandbox
+          artifact-name: "sandbox-{{build_name}}+{{build_number}}-{{platform}}.{{ext}}"
+          skip-clean: "true"
+          dart-define: '{"SELF_TEST":"true"}'
+
+      - name: Check the packaged artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          paths="${{ steps.package.outputs.artifact-paths }}"
+          printf 'artifact-paths: %s\n' "$paths"
+          printf 'artifact-count: %s\n' "${{ steps.package.outputs.artifact-count }}"
+          printf 'output-directory: %s\n' "${{ steps.package.outputs.output-directory }}"
+
+          count=0
+          IFS=',' read -r -a artifacts <<< "$paths"
+          for artifact in "${artifacts[@]}"; do
+            # fastforge reports Windows paths with backslashes.
+            artifact="$(printf '%s' "$artifact" | tr '\\' '/')"
+            if [ ! -f "sandbox/$artifact" ]; then
+              echo "::error::Missing artifact: sandbox/$artifact"
+              exit 1
+            fi
+            count=$((count + 1))
+          done
+
+          if [ "$count" != "${{ steps.package.outputs.artifact-count }}" ]; then
+            echo "::error::artifact-count does not match artifact-paths"
+            exit 1
+          fi
+
+      - name: Publish with the custom target
+        id: publish
+        uses: ./publish
+        with:
+          path: ${{ steps.package.outputs.artifact-paths }}
+          target: custom
+          working-directory: sandbox
+          publish-args: '{"command":"${{ matrix.verify }}"}'
+
+      - name: Check the publish output
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          message="${{ steps.publish.outputs.message }}"
+          printf 'publish message: %s\n' "$message"
+
+          if ! printf '%s' "$message" | grep -q 'sandbox'; then
+            echo "::error::publish did not report the artifact it was given"
+            exit 1
+          fi
