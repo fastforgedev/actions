@@ -119,7 +119,7 @@ runs:
         # (default: `dist/`).
         output_directory="dist/"
         if [ -f distribute_options.yaml ]; then
-          configured="$(sed -n 's/^output:[[:space:]]*//p' distribute_options.yaml | head -n1 | tr -d "\"'")"
+          configured="$(sed -n 's/^output:[[:space:]]*//p' distribute_options.yaml | head -n1 | tr -d "\"'\r")"
           if [ -n "$configured" ]; then
             output_directory="$configured"
           fi
@@ -159,9 +159,14 @@ runs:
         fi
 
         # `dart-define` is given as a JSON object so a whole environment can be
-        # passed with one input. `jq` ships with every GitHub-hosted runner.
+        # passed with one input. `jq` ships with every GitHub-hosted runner; on
+        # Windows it writes CRLF, so the trailing carriage return `read` keeps
+        # has to be dropped: an argument holding a CR cannot be handed to a
+        # batch file such as `flutter.bat` (Rust rejects it as an unsafe batch
+        # argument).
         if [ -n "$INPUT_DART_DEFINE" ]; then
           while IFS= read -r define; do
+            define="${define%$'\r'}"
             if [ -n "$define" ]; then
               args+=(--build-dart-define "$define")
             fi
@@ -195,7 +200,7 @@ runs:
           while IFS= read -r line; do
             case "$line" in
               *"Successfully packaged "*)
-                printf '%s\n' "${line##*Successfully packaged }" | sed "s/${esc}\[[0-9;]*m//g"
+                printf '%s\n' "${line##*Successfully packaged }" | sed "s/${esc}\[[0-9;]*m//g" | tr -d '\r'
                 ;;
             esac
           done

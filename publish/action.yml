@@ -209,9 +209,12 @@ runs:
 
         # `publish-args` is a JSON object so that arguments without a dedicated
         # input (for example `release-tag`, or the `s3`/`oss`/`cos` options) can
-        # still be passed. `jq` ships with every GitHub-hosted runner.
+        # still be passed. `jq` ships with every GitHub-hosted runner; on Windows
+        # it writes CRLF, so the trailing carriage return `read` keeps has to be
+        # dropped.
         if [ -n "$INPUT_PUBLISH_ARGS" ]; then
           while IFS= read -r argument; do
+            argument="${argument%$'\r'}"
             if [ -n "$argument" ]; then
               args+=(--publish-arg "$argument")
             fi
@@ -226,7 +229,7 @@ runs:
         published=0
 
         for path in "${paths[@]}"; do
-          path="$(printf '%s' "$path" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          path="$(printf '%s' "$path" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr -d '\r')"
           if [ -z "$path" ]; then
             continue
           fi

@@ -40,6 +40,19 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgtk-3-dev \
+            liblzma-dev \
+            libstdc++-12-dev
+
       - name: Install appimagetool
         if: runner.os == 'Linux'
         run: |
