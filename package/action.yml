@@ -35,6 +35,14 @@ inputs:
       Distribution channel. In the default artifact name it replaces the flavor
       segment.
     required: false
+  output:
+    description: >-
+      Directory the packaged artifacts are written to, relative to
+      `working-directory`. When left empty, fastforge writes to the `output` key
+      of `distribute_options.yaml`, or `dist/` when the project has no such
+      file. Needs a Fastforge release that has `fastforge package --output`
+      (0.7.0 and later).
+    required: false
   skip-clean:
     description: >-
       Set to `true` to skip `flutter clean` before packaging.
@@ -85,7 +93,8 @@ outputs:
     value: ${{ steps.package.outputs.artifact-count }}
   output-directory:
     description: >-
-      Directory the artifacts were written to, relative to `working-directory`.
+      Directory the artifacts were written to, relative to `working-directory`:
+      the `output` input when it was set, `dist/` otherwise.
     value: ${{ steps.package.outputs.output-directory }}
 
 runs:
@@ -100,6 +109,7 @@ runs:
         INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
         INPUT_ARTIFACT_NAME: ${{ inputs.artifact-name }}
         INPUT_CHANNEL: ${{ inputs.channel }}
+        INPUT_OUTPUT: ${{ inputs.output }}
         INPUT_SKIP_CLEAN: ${{ inputs.skip-clean }}
         INPUT_BUILD_TARGET: ${{ inputs.build-target }}
         INPUT_BUILD_FLAVOR: ${{ inputs.build-flavor }}
@@ -114,16 +124,9 @@ runs:
 
         cd "${INPUT_WORKING_DIRECTORY:-.}"
 
-        # `fastforge package` writes to `<output>/<app version>/<artifact name>`,
-        # where `<output>` is the `output` key of `distribute_options.yaml`
-        # (default: `dist/`).
-        output_directory="dist/"
-        if [ -f distribute_options.yaml ]; then
-          configured="$(sed -n 's/^output:[[:space:]]*//p' distribute_options.yaml | head -n1 | tr -d "\"'\r")"
-          if [ -n "$configured" ]; then
-            output_directory="$configured"
-          fi
-        fi
+        # Where fastforge writes the artifacts. Without `--output` it honours the
+        # `output` key of `distribute_options.yaml`, or `dist/`.
+        output_directory="${INPUT_OUTPUT:-dist/}"
 
         args=(package --platform "$INPUT_PLATFORM" --targets "$INPUT_TARGET")
 
@@ -132,6 +135,9 @@ runs:
         fi
         if [ -n "$INPUT_CHANNEL" ]; then
           args+=(--channel "$INPUT_CHANNEL")
+        fi
+        if [ -n "$INPUT_OUTPUT" ]; then
+          args+=(--output "$INPUT_OUTPUT")
         fi
         if [ "$INPUT_SKIP_CLEAN" = "true" ]; then
           args+=(--skip-clean)

@@ -77,6 +77,7 @@ platform shares a single `flutter build`.
 | `working-directory`          | Directory holding `pubspec.yaml`. Defaults to `.`.                                    |
 | `artifact-name`              | Mustache template for the artifact name, for example `{{name}}-{{build_name}}-{{platform}}.{{ext}}`. |
 | `channel`                    | Distribution channel, replaces the flavor segment of the default artifact name.        |
+| `output`                     | Directory the artifacts are written to. Defaults to the `output` of `distribute_options.yaml`, or `dist/`; needs a Fastforge with `fastforge package --output`. |
 | `skip-clean`                 | `true` skips `flutter clean` before packaging.                                        |
 | `build-target`               | The `--target` passed to `flutter build`, for example `lib/main_prod.dart`.            |
 | `build-flavor`               | The `--flavor` passed to `flutter build`.                                             |
@@ -90,12 +91,13 @@ platform shares a single `flutter build`.
 | ------------------ | -------------------------------------------------------------------------- |
 | `artifact-paths`   | Comma separated list of the packaged artifacts, relative to `working-directory`. |
 | `artifact-count`   | Number of artifacts that were packaged.                                    |
-| `output-directory` | Directory the artifacts were written to (the `output` key of `distribute_options.yaml`, default `dist/`). |
+| `output-directory` | The `output` input when it was set, `dist/` otherwise.                      |
 
 Artifacts are written to `<output-directory>/<app version>/<artifact name>`.
-Every packaging step of a release should pass `artifact-name` explicitly: the
+Every packaging step of a release passes `artifact-name` explicitly: the
 `artifact_name` key of `distribute_options.yaml` is only read by the legacy
-`fastforge release` command.
+`fastforge release` command, and the `output` input covers the one key that the
+action used to take from that file, so a project does not need one at all.
 
 ## `fastforgedev/actions/publish`
 
